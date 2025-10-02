@@ -65,17 +65,13 @@ class TradingEnv:
         self.history_deque.clear()
 
         # --- Features reali dallo storico ---
-        df_window = self.data.iloc[self.current_step - self.window : self.current_step]
-        norm_df = (df_window[self.feature_cols] - df_window[self.feature_cols].min()) / (
-                   df_window[self.feature_cols].max() - df_window[self.feature_cols].min() + 1e-8
-                                                                                         )
-        norm_features = norm_df.values.astype(np.float32)
-
+        df_window = self.data.iloc[self.current_step - self.window : self.current_step][self.feature_cols].astype(np.float32)
+        
         # --- Extra pnl/position iniziali (tutti zero) ---
         extra_block = np.tile(np.array([self.pnl, self.position], dtype=np.float32), (self.window, 1))
 
         # --- Combina features + extra ---
-        sequence = np.hstack([norm_features, extra_block])
+        sequence = np.hstack([df_window, extra_block])
 
         # --- Riempie la deque con la sequenza iniziale ---
         for row in sequence:
@@ -88,20 +84,22 @@ class TradingEnv:
 
     # ---------------------- Stato ----------------------
     def _get_state(self):
+
         """
         Aggiorna la deque con l'ultima osservazione normalizzata + pnl/posizione.
         Restituisce sequenza di shape [window, n_features + 2].
-        """
-        df_window = self.data.iloc[self.current_step - self.window : self.current_step]
-        norm_df = (df_window[self.feature_cols] - df_window[self.feature_cols].min()) / (
-                   df_window[self.feature_cols].max() - df_window[self.feature_cols].min() + 1e-8
-                                                                                         )
+        """ 
 
-        features = norm_df.iloc[-1].values.astype(np.float32)
-        extra = np.array([self.pnl, self.position], dtype=np.float32)
-        step_state = np.hstack([features, extra])
+        if self.current_step == self.window:
+            return np.array(self.history_deque, dtype=np.float32)
 
-        self.history_deque.append(step_state)
+        else:
+
+          features = self.data.iloc[self.current_step - self.window : self.current_step][self.feature_cols].iloc[-1].values.astype(np.float32)
+          extra = np.array([self.pnl, self.position], dtype=np.float32)
+          step_state = np.hstack([features, extra])
+
+          self.history_deque.append(step_state)
 
         return np.array(self.history_deque, dtype=np.float32)
 
