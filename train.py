@@ -24,7 +24,7 @@ def plot_trades(env, episode, save_dir="plots"):
     plt.close()
 
 
-def train(env, max_episodes=200):
+def train(env, folder_model_name, max_episodes=200):
     state_shape = env.reset().shape
     n_actions = 3
     agent = DoubleDQNAgent(state_shape, n_actions)
@@ -91,16 +91,16 @@ def train(env, max_episodes=200):
         # Salva modello migliore
         if ep_reward > best_reward:
             best_reward = ep_reward
-            agent.save(best_model_path)
+            agent.save(os.path.join(folder_model_name, best_model_path))
             print(f"Nuovo best model salvato con total reward {best_reward:.4f} e {env.num_trades} trades")
 
     summary_writer.flush()
     summary_writer.close()
     print(f"Training completato. Miglior modello salvato in {best_model_path} con reward {best_reward:.4f}")
-    return agent,best_model_path
 
 
-def evaluate(env, n_episodes=5, best_model_path="best_trading_agent.h5"):
+
+def evaluate(env,folder_model_name, n_episodes=5, best_model_path="best_trading_agent.h5"):
 
     """
     Valuta l'agente utilizzando il modello con il total reward più alto.
@@ -114,8 +114,8 @@ def evaluate(env, n_episodes=5, best_model_path="best_trading_agent.h5"):
     agent = DoubleDQNAgent(state_shape, n_actions)
 
     # Carica modello migliore
-    if os.path.exists(best_model_path):
-        agent.load(best_model_path)
+    if os.path.exists(os.path.join(folder_model_name, best_model_path)):
+        agent.load(os.path.join(folder_model_name,best_model_path))
         print(f"Caricato modello migliore da {best_model_path}")
     else:
         raise FileNotFoundError(f"Il modello migliore non è stato trovato in {best_model_path}")

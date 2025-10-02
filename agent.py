@@ -5,8 +5,8 @@ import numpy as np
 import collections
 import random
 
-GAMMA = 0.99
-LR = 0.001
+GAMMA = 0.99 # discount rate of future return
+LR = 0.1   # the more the faster change the q values
 
 BATCH_SIZE = 64
 BUFFER_SIZE = 150_000
@@ -14,9 +14,9 @@ BUFFER_SIZE = 150_000
 MIN_REPLAY_SIZE = 500
 TAU = 0.1
 
-EPS_START = 1.0
-EPS_END=0.01
-EPS_DECAY_STEPS= 2_000_000
+EPS_START =       1.0
+EPS_END =         0.05
+EPS_DECAY_STEPS=  2_500_000
 
 class ReplayBuffer:
     def __init__(self, max_size=BUFFER_SIZE):
@@ -33,22 +33,34 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
 
-def build_q_network(state_shape, n_actions, hidden_units=(128,128)):
-    inputs = keras.Input(shape=state_shape)
-    x = inputs
-    for h in hidden_units:
-        x = layers.Dense(h, activation="relu")(x)
+
+def build_q_network_lstm(state_shape, n_actions, lstm_units=64, hidden_units=(128,)):
+    """
+    state_shape = (window, n_features+2)
+    """
+    inputs = keras.Input(shape=state_shape)  # [window, features]
+
+    # --- CNN per pattern locali ---
+    x = layers.Conv1D(filters=32, kernel_size=3, activation='relu', padding='causal')(inputs)
+    x = layers.Conv1D(filters=64, kernel_size=3, activation='relu', padding='causal')(x)
+
+    # --- LSTM per trend a lungo termine ---
+    x = layers.LSTM(64, return_sequences=False)(x)
+
+    # --- Dense finale per Q-values ---
+    x = layers.Dense(128, activation='relu')(x)
     outputs = layers.Dense(n_actions, activation=None)(x)
-    q_net = keras.Model(inputs=inputs, outputs=outputs)
-    #keras.utils.plot_model(q_net, "q_netwrk.png")
-    return q_net
+
+    model = keras.Model(inputs=inputs, outputs=outputs)
+
+    return model
+
 
 class DoubleDQNAgent:
     def __init__(self, state_shape, n_actions):
-
         self.n_actions = n_actions
-        self.q_net = build_q_network(state_shape, n_actions)
-        self.target_q_net = build_q_network(state_shape, n_actions)
+        self.q_net = build_q_network_lstm(state_shape, n_actions)
+        self.target_q_net = build_q_network_lstm(state_shape, n_actions)
         self.target_q_net.set_weights(self.q_net.get_weights())
         self.optimizer = keras.optimizers.Adam(learning_rate=LR)
         self.loss_fn = keras.losses.MeanSquaredError()
